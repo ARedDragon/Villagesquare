@@ -216,6 +216,44 @@ function rpsWinner(a, b) {
   return "b";
 }
 
+const TRIVIA_QUESTIONS = [
+  { q: "What does CPU stand for?", opts: ["A. Central Processing Unit", "B. Core Processing Utility", "C. Computer Power Unit", "D. Central Program Uplink"], ans: "A" },
+  { q: "Which language is known as 'the language of the web'?", opts: ["A. Python", "B. Java", "C. JavaScript", "D. C++"], ans: "C" },
+  { q: "What is 2 to the power of 10?", opts: ["A. 512", "B. 1000", "C. 1024", "D. 2048"], ans: "C" },
+  { q: "What does HTTP stand for?", opts: ["A. HyperText Transfer Protocol", "B. High Transfer Tech Process", "C. Hyperlink Transfer Protocol", "D. HyperText Transport Path"], ans: "A" },
+  { q: "Which data structure uses LIFO order?", opts: ["A. Queue", "B. Stack", "C. Heap", "D. Linked List"], ans: "B" },
+  { q: "What symbol starts a comment in Python?", opts: ["A. //", "B. ##", "C. #", "D. /*"], ans: "C" },
+  { q: "What is the binary for the decimal number 10?", opts: ["A. 1000", "B. 1010", "C. 1001", "D. 0110"], ans: "B" },
+  { q: "Which company created JavaScript?", opts: ["A. Microsoft", "B. Google", "C. Netscape", "D. Apple"], ans: "C" },
+  { q: "What does RAM stand for?", opts: ["A. Read-Access Memory", "B. Random-Access Memory", "C. Run-time Allocation Module", "D. Rapid Access Mechanism"], ans: "B" },
+  { q: "What is the default port for HTTPS?", opts: ["A. 80", "B. 8080", "C. 443", "D. 22"], ans: "C" },
+  { q: "Which sort has O(n log n) worst-case time?", opts: ["A. Bubble Sort", "B. Insertion Sort", "C. Quick Sort", "D. Merge Sort"], ans: "D" },
+  { q: "What does 'git pull' do?", opts: ["A. Push local changes to remote", "B. Fetch and merge remote changes", "C. Delete a remote branch", "D. Clone a repository"], ans: "B" },
+  { q: "Which HTML tag makes the largest heading?", opts: ["A. <h2>", "B. <h6>", "C. <h1>", "D. <head>"], ans: "C" },
+  { q: "What is 'null' in JavaScript?", opts: ["A. A runtime error type", "B. An intentionally empty value", "C. An undeclared variable", "D. The number zero"], ans: "B" },
+  { q: "What port does SSH use by default?", opts: ["A. TCP 21", "B. UDP 22", "C. TCP 22", "D. TCP 80"], ans: "C" },
+  { q: "What does DNS stand for?", opts: ["A. Data Network Service", "B. Dynamic Name Server", "C. Domain Name System", "D. Distributed Node Socket"], ans: "C" },
+  { q: "Which of these is NOT a JavaScript framework?", opts: ["A. React", "B. Vue", "C. Django", "D. Angular"], ans: "C" },
+  { q: "What does 'var' vs 'let' differ in (JS)?", opts: ["A. Data type", "B. Scope", "C. Speed", "D. Nothing"], ans: "B" },
+  { q: "How many bits are in a byte?", opts: ["A. 4", "B. 16", "C. 8", "D. 32"], ans: "C" },
+  { q: "Which symbol is the logical AND in most languages?", opts: ["A. ||", "B. &&", "C. !", "D. ^^"], ans: "B" },
+];
+
+const TYPERACE_PHRASES = [
+  "the quick brown fox jumps over the lazy dog",
+  "code never lies comments sometimes do",
+  "first solve the problem then write the code",
+  "make it work make it right make it fast",
+  "talk is cheap show me the code",
+  "any sufficiently advanced technology is indistinguishable from magic",
+  "the best error message is the one that never shows up",
+  "with great power comes great responsibility",
+  "simplicity is the soul of efficiency",
+  "always code as if the person maintaining it is a maniac who knows where you live",
+  "programs must be written for people to read not machines to execute",
+  "debugging is twice as hard as writing the code in the first place",
+];
+
 function broadcastToChannel(channelId, event, payload) {
   const dmParts = dmParticipants(channelId);
   if (dmParts.length) {
@@ -812,7 +850,7 @@ io.on("connection", (socket) => {
 
   socket.on("game-challenge", ({ channelId, game, question, wager }) => {
     if (!socket.username || !channelId) return;
-    const validGames = ["rps", "dice", "coinflip", "numberduel", "reaction", "mathduel"];
+    const validGames = ["rps", "dice", "coinflip", "numberduel", "reaction", "mathduel", "trivia", "typerace"];
     const g = validGames.includes(game) ? game : "rps";
     // wager is a numeric token amount (0 = no wager)
     const wagerAmount = Math.max(0, Math.min(100, parseInt(wager) || 0));
@@ -844,7 +882,7 @@ io.on("connection", (socket) => {
       gameState.delete(gameId);
     }, 5 * 60 * 1000);
 
-    const gameNames = { rps: "Rock Paper Scissors", dice: "Dice Duel", coinflip: "Coin Flip", numberduel: "Number Duel", reaction: "Reaction Race", mathduel: "Math Duel" };
+    const gameNames = { rps: "Rock Paper Scissors", dice: "Dice Duel", coinflip: "Coin Flip", numberduel: "Number Duel", reaction: "Reaction Race", mathduel: "Math Duel", trivia: "Trivia Duel", typerace: "Type Race" };
     const wagerNote = wagerAmount > 0 ? ` 🪙 wager: ${wagerAmount}` : "";
     const challengeText = `${socket.username} challenged to ${gameNames[g]}!${wagerNote}`;
     const challengeMsg = {
@@ -990,6 +1028,33 @@ io.on("connection", (socket) => {
       return;
     }
 
+    if (gs.game === "trivia") {
+      const tq = TRIVIA_QUESTIONS[Math.floor(Math.random() * TRIVIA_QUESTIONS.length)];
+      gs.triviaQuestion = tq.q;
+      gs.triviaOptions = tq.opts;
+      gs.triviaAnswer = tq.ans;
+      io.to(userRoom(gs.challenger)).emit("game-started", {
+        gameId, game: "trivia", gameName: "Trivia Duel",
+        question: gs.triviaQuestion, options: gs.triviaOptions, opponent: gs.opponent,
+      });
+      io.to(userRoom(gs.opponent)).emit("game-started", {
+        gameId, game: "trivia", gameName: "Trivia Duel",
+        question: gs.triviaQuestion, options: gs.triviaOptions, opponent: gs.challenger,
+      });
+      return;
+    }
+
+    if (gs.game === "typerace") {
+      gs.typePhrase = TYPERACE_PHRASES[Math.floor(Math.random() * TYPERACE_PHRASES.length)];
+      io.to(userRoom(gs.challenger)).emit("game-started", {
+        gameId, game: "typerace", gameName: "Type Race", phrase: gs.typePhrase, opponent: gs.opponent,
+      });
+      io.to(userRoom(gs.opponent)).emit("game-started", {
+        gameId, game: "typerace", gameName: "Type Race", phrase: gs.typePhrase, opponent: gs.challenger,
+      });
+      return;
+    }
+
     // RPS (default pick-based game)
     const gameNames = { rps: "Rock Paper Scissors" };
     io.to(userRoom(gs.challenger)).emit("game-started", {
@@ -1020,6 +1085,74 @@ io.on("connection", (socket) => {
         id: `${Date.now()}-mathduel`,
         type: "game-result", channelId: gs.channelId, user: "Game", game: "mathduel", gameId,
         text: `🧮 Math Duel — ${gs.mathProblem} = ${gs.mathAnswer}. ${winnerName} answered first!${tokenNote}`,
+        time: new Date().toISOString(),
+      };
+      store.addMessage(gs.channelId, result);
+      broadcastToChannel(gs.channelId, "message", result);
+      awardGameTokens(gs, winnerName);
+      io.to(userRoom(gs.challenger)).emit("game-result", { gameId });
+      io.to(userRoom(gs.opponent)).emit("game-result", { gameId });
+      gameState.delete(gameId);
+      return;
+    }
+
+    // ── Trivia Duel: first correct A/B/C/D answer wins ────────────────────────
+    if (gs.game === "trivia") {
+      const choice = String(move).toUpperCase().trim();
+      if (!["A", "B", "C", "D"].includes(choice)) return;
+      if (gs.moves[socket.username]) return; // already answered
+      if (choice !== gs.triviaAnswer) {
+        gs.moves[socket.username] = "wrong";
+        socket.emit("game-wrong-answer", { gameId, message: "Wrong answer! Waiting for opponent…" });
+        // If both answered wrong, pick random winner
+        if (gs.moves[gs.challenger] === "wrong" && gs.moves[gs.opponent] === "wrong") {
+          const winnerName = Math.random() < 0.5 ? gs.challenger : gs.opponent;
+          const tokenNote = gs.tokensPot > 0 ? ` 🪙×${gs.tokensPot}` : "";
+          const result = {
+            id: `${Date.now()}-trivia`,
+            type: "game-result", channelId: gs.channelId, user: "Game", game: "trivia", gameId,
+            text: `🧠 Trivia Duel — Both got it wrong! The answer was ${gs.triviaAnswer}. ${winnerName} wins by luck!${tokenNote}`,
+            time: new Date().toISOString(),
+          };
+          store.addMessage(gs.channelId, result);
+          broadcastToChannel(gs.channelId, "message", result);
+          awardGameTokens(gs, winnerName);
+          io.to(userRoom(gs.challenger)).emit("game-result", { gameId });
+          io.to(userRoom(gs.opponent)).emit("game-result", { gameId });
+          gameState.delete(gameId);
+        }
+        return;
+      }
+      const winnerName = socket.username;
+      const tokenNote = gs.tokensPot > 0 ? ` 🪙×${gs.tokensPot}` : "";
+      const result = {
+        id: `${Date.now()}-trivia`,
+        type: "game-result", channelId: gs.channelId, user: "Game", game: "trivia", gameId,
+        text: `🧠 Trivia Duel — "${gs.triviaQuestion}" (Answer: ${gs.triviaAnswer}) — ${winnerName} got it first!${tokenNote}`,
+        time: new Date().toISOString(),
+      };
+      store.addMessage(gs.channelId, result);
+      broadcastToChannel(gs.channelId, "message", result);
+      awardGameTokens(gs, winnerName);
+      io.to(userRoom(gs.challenger)).emit("game-result", { gameId });
+      io.to(userRoom(gs.opponent)).emit("game-result", { gameId });
+      gameState.delete(gameId);
+      return;
+    }
+
+    // ── Type Race: first to type the phrase correctly wins ────────────────────
+    if (gs.game === "typerace") {
+      const typed = String(move).trim().toLowerCase();
+      if (typed !== gs.typePhrase.trim().toLowerCase()) {
+        socket.emit("game-wrong-answer", { gameId, message: "Not quite — check spelling and try again!" });
+        return;
+      }
+      const winnerName = socket.username;
+      const tokenNote = gs.tokensPot > 0 ? ` 🪙×${gs.tokensPot}` : "";
+      const result = {
+        id: `${Date.now()}-typerace`,
+        type: "game-result", channelId: gs.channelId, user: "Game", game: "typerace", gameId,
+        text: `⌨️ Type Race — "${gs.typePhrase}" — ${winnerName} typed it first!${tokenNote}`,
         time: new Date().toISOString(),
       };
       store.addMessage(gs.channelId, result);

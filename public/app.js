@@ -107,6 +107,18 @@ const mathduelProblem = document.getElementById("mathduel-problem");
 const mathduelInput = document.getElementById("mathduel-input");
 const mathduelSubmitBtn = document.getElementById("mathduel-submit-btn");
 const mathduelStatus = document.getElementById("mathduel-status");
+const triviaModal = document.getElementById("trivia-modal");
+const triviaOpponentLabel = document.getElementById("trivia-opponent-label");
+const triviaStatus = document.getElementById("trivia-status");
+const triviaQuestion = document.getElementById("trivia-question");
+const triviaOptBtns = () => document.querySelectorAll(".trivia-opt-btn");
+const typeraceModal = document.getElementById("typerace-modal");
+const typeraceOpponentLabel = document.getElementById("typerace-opponent-label");
+const typeraceStatus = document.getElementById("typerace-status");
+const typeracePhrase = document.getElementById("typerace-phrase");
+const typeraceInput = document.getElementById("typerace-input");
+const typeraceSubmitBtn = document.getElementById("typerace-submit-btn");
+const typeraceFeedback = document.getElementById("typerace-feedback");
 
 // ── Mentions banner ───────────────────────────────────────────────
 const mentionsBanner = document.getElementById("mentions-banner");
@@ -137,6 +149,8 @@ let friendDisplayNames = {}; // handle.lower() -> displayName for offline friend
 let myTokens = 0;
 let nextTokenAt = 0;
 let tokenTimerInterval = null;
+let _connectFallback = null;
+const _pageLoadTime = Date.now(); // used to ensure loading animation finishes before app is shown
 let wagerAmount = 0;
 let pendingNicknameTarget = null;
 let nicknames = JSON.parse(localStorage.getItem("villagesquare-nicknames") || "{}");
@@ -857,6 +871,7 @@ function closeNumduelModal() {
 
 function closeReactionModal() {
   if (reactionModal) reactionModal.classList.add("hidden");
+  reactionTapped = false;
   activeGameId = null;
 }
 
@@ -864,6 +879,19 @@ function closeMathduelModal() {
   if (mathduelModal) mathduelModal.classList.add("hidden");
   if (mathduelInput) mathduelInput.value = "";
   if (mathduelStatus) mathduelStatus.textContent = "";
+  activeGameId = null;
+}
+
+function closeTriviaModal() {
+  if (triviaModal) triviaModal.classList.add("hidden");
+  triviaOptBtns().forEach((b) => { b.disabled = false; b.classList.remove("wrong", "correct"); });
+  activeGameId = null;
+}
+
+function closeTyperaceModal() {
+  if (typeraceModal) typeraceModal.classList.add("hidden");
+  if (typeraceInput) typeraceInput.value = "";
+  if (typeraceFeedback) typeraceFeedback.textContent = "";
   activeGameId = null;
 }
 
@@ -984,18 +1012,26 @@ function renderGsSettings({ members, whitelist, blacklist, passcode }) {
 }
 
 function showApp() {
+  if (_connectFallback) { clearTimeout(_connectFallback); _connectFallback = null; }
+  const elapsed = Date.now() - _pageLoadTime;
+  const minDelay = 3200; // match loading animation duration
+  const remaining = Math.max(0, minDelay - elapsed);
   const loadingScreen = document.getElementById("loading-screen");
-  if (loadingScreen) {
-    loadingScreen.classList.add("fade-out");
-    setTimeout(() => loadingScreen.remove(), 600);
-  }
-  joinScreen.classList.add("hidden");
-  appEl.classList.remove("hidden");
-  myNameLabel.textContent = myDisplayName || myName;
-  if (myHandleLabel) myHandleLabel.textContent = "@" + myName;
+  const doShow = () => {
+    if (loadingScreen) {
+      loadingScreen.classList.add("fade-out");
+      setTimeout(() => loadingScreen.remove(), 600);
+    }
+    joinScreen.classList.add("hidden");
+    appEl.classList.remove("hidden");
+    myNameLabel.textContent = myDisplayName || myName;
+    if (myHandleLabel) myHandleLabel.textContent = "@" + myName;
+  };
+  if (remaining > 0) setTimeout(doShow, remaining); else doShow();
 }
 
 function showJoin() {
+  if (_connectFallback) { clearTimeout(_connectFallback); _connectFallback = null; }
   const loadingScreen = document.getElementById("loading-screen");
   if (loadingScreen) {
     loadingScreen.classList.add("fade-out");
@@ -1071,6 +1107,12 @@ async function connect() {
   socket.on("register-error", ({ message }) => {
     showJoinError(message);
     socket.disconnect();
+    socket = null;
+  });
+
+  socket.on("connect_error", () => {
+    showJoin();
+    showJoinError("Could not reach the server. Check your connection and try again.");
     socket = null;
   });
 
@@ -1208,7 +1250,7 @@ async function connect() {
     if (activeChannelId) renderMessages(activeChannelId);
   });
 
-  socket.on("game-started", ({ gameId, game, opponent, problem }) => {
+  socket.on("game-started", ({ gameId, game, opponent, problem, question, options, phrase }) => {
     activeGameId = gameId;
     if (game === "numberduel") {
       numduelOpponentLabel.textContent = "vs " + opponent;
@@ -1219,6 +1261,7 @@ async function connect() {
       if (reactionOpponentLabel) reactionOpponentLabel.textContent = "vs " + opponent;
       if (reactionStatus) reactionStatus.textContent = "Get ready… tap the instant you see GO!";
       if (reactionTapBtn) { reactionTapBtn.classList.add("hidden"); reactionTapBtn.disabled = false; }
+      reactionTapped = false;
       if (reactionModal) reactionModal.classList.remove("hidden");
     } else if (game === "mathduel") {
       if (mathduelOpponentLabel) mathduelOpponentLabel.textContent = "vs " + opponent;
@@ -1254,6 +1297,8 @@ async function connect() {
       closeNumduelModal();
       closeReactionModal();
       closeMathduelModal();
+      closeTriviaModal();
+      closeTyperaceModal();
     }
   });
 
@@ -1267,9 +1312,17 @@ async function connect() {
     if (reactionTapBtn) { reactionTapBtn.classList.remove("hidden"); reactionTapBtn.disabled = false; }
   });
 
-  socket.on("game-wrong-answer", ({ message }) => {
-    if (mathduelStatus) mathduelStatus.textContent = "❌ " + message;
-    if (mathduelInput) { mathduelInput.value = ""; mathduelInput.focus(); }
+  socket.on("game-wrong-answer", ({ gameId, message }) => {
+    if (mathduelModal && !mathduelModal.classList.contains("hidden")) {
+      if (mathduelStatus) mathduelStatus.textContent = "❌ " + message;
+      if (mathduelInput) { mathduelInput.value = ""; mathduelInput.focus(); }
+    } else if (triviaModal && !triviaModal.classList.contains("hidden")) {
+      if (triviaStatus) triviaStatus.textContent = "❌ " + message;
+      triviaOptBtns().forEach((b) => (b.disabled = true));
+    } else if (typeraceModal && !typeraceModal.classList.contains("hidden")) {
+      if (typeraceFeedback) typeraceFeedback.textContent = "❌ " + message;
+      if (typeraceInput) { typeraceInput.value = ""; typeraceInput.focus(); }
+    }
   });
 
   socket.on("group-settings", (data) => {
@@ -1501,9 +1554,11 @@ document.querySelectorAll(".num-pick-btn").forEach((btn) => {
 });
 
 // Reaction Race — tap button
+let reactionTapped = false;
 if (reactionTapBtn) {
   reactionTapBtn.addEventListener("click", () => {
-    if (!activeGameId || !socket) return;
+    if (!activeGameId || !socket || reactionTapped) return;
+    reactionTapped = true;
     reactionTapBtn.disabled = true;
     socket.emit("game-move", { gameId: activeGameId, move: "react" });
   });
@@ -1525,6 +1580,28 @@ if (reactionModal) reactionModal.addEventListener("click", (e) => { if (e.target
 const closeMathduelBtn = document.getElementById("close-mathduel-btn");
 if (closeMathduelBtn) closeMathduelBtn.addEventListener("click", closeMathduelModal);
 if (mathduelModal) mathduelModal.addEventListener("click", (e) => { if (e.target === mathduelModal) closeMathduelModal(); });
+if (triviaModal) triviaModal.addEventListener("click", (e) => { if (e.target === triviaModal) closeTriviaModal(); });
+if (typeraceModal) typeraceModal.addEventListener("click", (e) => { if (e.target === typeraceModal) closeTyperaceModal(); });
+
+// Trivia Duel — answer buttons
+triviaOptBtns().forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (!activeGameId || !socket || btn.disabled) return;
+    const choice = btn.dataset.choice;
+    triviaOptBtns().forEach((b) => (b.disabled = true));
+    socket.emit("game-move", { gameId: activeGameId, move: choice });
+  });
+});
+
+// Type Race — submit
+function submitTyperace() {
+  const typed = typeraceInput ? typeraceInput.value : "";
+  if (!typed || !activeGameId || !socket) return;
+  if (typeraceFeedback) typeraceFeedback.textContent = "";
+  socket.emit("game-move", { gameId: activeGameId, move: typed });
+}
+if (typeraceSubmitBtn) typeraceSubmitBtn.addEventListener("click", submitTyperace);
+if (typeraceInput) typeraceInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitTyperace(); });
 
 // Magic 8-Ball question modal
 eightballSubmitBtn.addEventListener("click", () => {
@@ -1888,9 +1965,17 @@ if (savedName) {
   usernameInput.classList.add("handle-locked");
   const lockedRow = document.getElementById("handle-locked-row");
   if (lockedRow) lockedRow.classList.remove("hidden");
+  // Safety net: if the socket never registers within 10s, fall back to join screen
+  _connectFallback = setTimeout(() => {
+    if (document.getElementById("loading-screen")) {
+      showJoin();
+      showJoinError("Connection timed out. Check your network and try again.");
+    }
+  }, 10000);
   connect();
 } else {
-  showJoin();
+  // Let the loading animation play (~3.2s) before revealing the join screen
+  setTimeout(() => showJoin(), 3200);
 }
 
 // Reset handle button — lets a user choose a fresh identity on this device

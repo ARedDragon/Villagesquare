@@ -1,9 +1,12 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Villagesquare</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -77,7 +80,7 @@
           </div>
         </div>
         <div class="sidebar-actions">
-          <button id="groups-btn" type="button" class="action-btn">&#x1F3D8;&#xFE0F; Squares</button>
+          <button id="groups-btn" type="button" class="action-btn">&#x1F465; Groups</button>
         </div>
         <div id="mentions-banner" class="mentions-banner hidden" role="alert">
           <span id="mentions-banner-text"></span>
@@ -89,7 +92,7 @@
           <p id="chat-list-empty" class="empty-hint hidden">No chats yet &mdash; open Squares or message someone online.</p>
         </div>
         <div class="sidebar-section">
-          <h2>Villagers online</h2>
+          <h2>People</h2>
           <ul id="online-list" class="online-list"></ul>
           <p id="online-empty" class="empty-hint">Nobody else in the square yet.</p>
         </div>
@@ -139,6 +142,8 @@
               <button type="button" class="dropdown-item" data-game="8ball">&#x1F3B1; Magic 8-Ball</button>
               <button type="button" class="dropdown-item" data-game="reaction">&#x26A1; Reaction Race</button>
               <button type="button" class="dropdown-item" data-game="mathduel">&#x1F9EE; Math Duel</button>
+              <button type="button" class="dropdown-item" data-game="trivia">&#x1F9E0; Trivia Duel</button>
+              <button type="button" class="dropdown-item" data-game="typerace">&#x2328;&#xFE0F; Type Race</button>
               <div class="dropdown-divider"></div>
               <div class="wager-row" id="wager-row">
                 <label class="wager-label" for="wager-amount-input">&#x1FA99; Wager</label>
@@ -163,7 +168,7 @@
   <div id="groups-modal" class="modal hidden" role="dialog" aria-labelledby="groups-modal-title">
     <div class="modal-card">
       <header class="modal-head">
-        <h2 id="groups-modal-title">&#x1F3D8;&#xFE0F; Squares</h2>
+        <h2 id="groups-modal-title">&#x1F465; Groups</h2>
         <button id="close-groups-btn" type="button" class="icon-btn" aria-label="Close">&times;</button>
       </header>
       <div class="modal-tabs">
@@ -272,6 +277,39 @@
       <div class="reaction-go-area">
         <button type="button" id="reaction-tap-btn" class="reaction-tap-btn hidden" disabled>TAP!</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Trivia Duel modal -->
+  <div id="trivia-modal" class="modal hidden" role="dialog" aria-label="Trivia Duel">
+    <div class="modal-card">
+      <header class="modal-head">
+        <h2>&#x1F9E0; Trivia Duel</h2>
+      </header>
+      <p class="modal-hint" id="trivia-opponent-label"></p>
+      <p class="modal-hint" id="trivia-status">First correct answer wins!</p>
+      <p id="trivia-question" class="trivia-question"></p>
+      <div class="trivia-options" id="trivia-options">
+        <button type="button" class="trivia-opt-btn" data-choice="A"></button>
+        <button type="button" class="trivia-opt-btn" data-choice="B"></button>
+        <button type="button" class="trivia-opt-btn" data-choice="C"></button>
+        <button type="button" class="trivia-opt-btn" data-choice="D"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Type Race modal -->
+  <div id="typerace-modal" class="modal hidden" role="dialog" aria-label="Type Race">
+    <div class="modal-card">
+      <header class="modal-head">
+        <h2>&#x2328;&#xFE0F; Type Race</h2>
+      </header>
+      <p class="modal-hint" id="typerace-opponent-label"></p>
+      <p class="modal-hint" id="typerace-status">Type the phrase below as fast as you can!</p>
+      <p id="typerace-phrase" class="typerace-phrase"></p>
+      <input id="typerace-input" type="text" placeholder="Type here…" autocomplete="off" spellcheck="false" />
+      <p id="typerace-feedback" class="modal-hint" style="color: var(--unread); min-height: 1.2em;"></p>
+      <button id="typerace-submit-btn" type="button" class="modal-primary">Submit</button>
     </div>
   </div>
 
