@@ -1606,15 +1606,48 @@ if (nicknameBtn) {
   });
 }
 
+const donateModal = document.getElementById("donate-modal");
+const donateModalTarget = document.getElementById("donate-modal-target");
+const donateAmountInput = document.getElementById("donate-amount-input");
+const donateConfirmBtn = document.getElementById("donate-confirm-btn");
+const closeDonateModalBtn = document.getElementById("close-donate-modal-btn");
+
 if (donateTokenDmBtn) {
   donateTokenDmBtn.addEventListener("click", () => {
     const target = donateTokenDmBtn.dataset.target;
     if (!socket || !target) return;
     if (myTokens < 1) { alert("You have no tokens to give."); return; }
-    if (confirm(`Send 1 token to ${target}?`)) {
-      socket.emit("donate-token", { targetName: target });
-    }
+    if (donateModalTarget) donateModalTarget.textContent = target;
+    if (donateAmountInput) { donateAmountInput.value = 1; donateAmountInput.max = myTokens; }
+    if (donateModal) donateModal.classList.remove("hidden");
+    if (donateAmountInput) donateAmountInput.focus();
   });
+}
+
+if (closeDonateModalBtn) {
+  closeDonateModalBtn.addEventListener("click", () => {
+    if (donateModal) donateModal.classList.add("hidden");
+  });
+}
+if (donateModal) {
+  donateModal.addEventListener("click", (e) => { if (e.target === donateModal) donateModal.classList.add("hidden"); });
+}
+
+function submitDonate() {
+  const target = donateTokenDmBtn && donateTokenDmBtn.dataset.target;
+  if (!socket || !target) return;
+  const amt = parseInt(donateAmountInput && donateAmountInput.value, 10);
+  if (!amt || amt < 1) { alert("Enter a valid amount."); return; }
+  if (amt > myTokens) { alert(`You only have ${myTokens} token${myTokens !== 1 ? "s" : ""}.`); return; }
+  socket.emit("donate-token", { targetName: target, amount: amt });
+  if (donateModal) donateModal.classList.add("hidden");
+}
+
+if (donateConfirmBtn) {
+  donateConfirmBtn.addEventListener("click", submitDonate);
+}
+if (donateAmountInput) {
+  donateAmountInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitDonate(); });
 }
 
 if (nicknameSaveBtn) {
@@ -1856,6 +1889,8 @@ if (savedName) {
   const lockedRow = document.getElementById("handle-locked-row");
   if (lockedRow) lockedRow.classList.remove("hidden");
   connect();
+} else {
+  showJoin();
 }
 
 // Reset handle button — lets a user choose a fresh identity on this device

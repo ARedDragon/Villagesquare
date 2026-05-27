@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VillageSquare</title>
+  <title>Villagesquare</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -19,7 +19,7 @@
         <span>&#x1F333;</span>
       </div>
       <div class="loading-ground"></div>
-      <h1 class="loading-title">VillageSquare</h1>
+      <h1 class="loading-title">Villagesquare</h1>
       <p class="loading-sub">Connecting to the square<span class="loading-dots"></span></p>
       <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
     </div>
@@ -30,20 +30,20 @@
       <div class="brand">
         <span class="brand-mark vs-brand-mark">&#x1F3D8;&#xFE0F;</span>
         <div>
-          <h1>VillageSquare</h1>
+          <h1>Villagesquare</h1>
           <p class="tagline">Your town, your people</p>
         </div>
       </div>
       <label>
         Handle <span class="hint-small">(permanent &mdash; your unique @handle, set it once)</span>
-        <input id="username" type="text" placeholder="e.g. jayde" maxlength="20" autocomplete="username" />
+        <input id="username" type="text" placeholder="e.g. Bob" maxlength="20" autocomplete="username" />
       </label>
       <div id="handle-locked-row" class="handle-locked-row hidden">
         <span>&#x1F512; Handle locked to this device.</span>
       </div>
       <label>
         Display name <span class="hint-small">(shown to others &mdash; changeable any time)</span>
-        <input id="display-name-input" type="text" placeholder="e.g. Jayde" maxlength="32" autocomplete="nickname" />
+        <input id="display-name-input" type="text" placeholder="e.g. Bob" maxlength="32" autocomplete="nickname" />
       </label>
       <label id="pin-label">
         Password / PIN <span class="hint-small">(4+ digits = PIN &nbsp;&middot;&nbsp; 4+ text = password)</span>
@@ -126,7 +126,7 @@
             <p id="chat-subtitle"></p>
           </div>
           <button id="nickname-btn" type="button" class="icon-btn hidden" title="Set nickname">&#x270F;&#xFE0F;</button>
-          <button id="donate-token-dm-btn" type="button" class="icon-btn hidden" title="Give 1 token">&#x1FA99;</button>
+          <button id="donate-token-dm-btn" type="button" class="icon-btn hidden" title="Give tokens">&#x1FA99;</button>
           <button id="block-chat-btn" type="button" class="icon-btn hidden" title="Block user">Block</button>
           <button id="group-settings-btn" type="button" class="icon-btn hidden" title="Square settings">&#x2699;&#xFE0F;</button>
           <div class="games-dropdown" id="games-dropdown">
@@ -339,6 +339,21 @@
   </div>
 
   <!-- Nickname modal -->
+  <!-- Donate token modal -->
+  <div id="donate-modal" class="modal hidden" role="dialog" aria-labelledby="donate-modal-title">
+    <div class="modal-card">
+      <header class="modal-head">
+        <h2 id="donate-modal-title">&#x1FA99; Give Tokens</h2>
+        <button id="close-donate-modal-btn" type="button" class="icon-btn" aria-label="Close">&times;</button>
+      </header>
+      <p class="modal-hint">Send tokens to <strong id="donate-modal-target"></strong>.</p>
+      <label>Amount
+        <input id="donate-amount-input" type="number" min="1" max="9999" value="1" autocomplete="off" />
+      </label>
+      <button id="donate-confirm-btn" type="button" class="modal-primary">Send</button>
+    </div>
+  </div>
+
   <div id="nickname-modal" class="modal hidden" role="dialog" aria-labelledby="nickname-modal-title">
     <div class="modal-card">
       <header class="modal-head">

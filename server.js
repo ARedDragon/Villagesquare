@@ -354,9 +354,9 @@ io.on("connection", (socket) => {
     }
     socket.displayName = store.getDisplayName(name);
 
-    // Hourly token system: set nextTokenAt on first ever login
+    // Token system: set nextTokenAt on first ever login (5-min interval)
     if (!store.getNextTokenAt(name)) {
-      store.setNextTokenAt(name, Date.now() + 60 * 60 * 1000);
+      store.setNextTokenAt(name, Date.now() + 5 * 60 * 1000);
     }
     const chats = store.getUserChats(name);
     const blocked = store.getUserBlocked(name);
@@ -1181,7 +1181,7 @@ io.on("connection", (socket) => {
       return;
     }
     store.setTokens(socket.username, store.getTokens(socket.username) + 1);
-    const newNextAt = now + 60 * 60 * 1000;
+    const newNextAt = now + 5 * 60 * 1000;
     store.setNextTokenAt(socket.username, newNextAt);
     socket.emit("token-updated", {
       tokens: store.getTokens(socket.username),
@@ -1255,19 +1255,20 @@ io.on("connection", (socket) => {
     emitFriendsUpdate(target);
   });
 
-  socket.on("donate-token", ({ targetName }) => {
+  socket.on("donate-token", ({ targetName, amount }) => {
     if (!socket.username || !targetName) return;
     const target = String(targetName).trim().slice(0, 24);
     if (!target || nameKey(target) === nameKey(socket.username)) return;
+    const amt = Math.min(Math.max(Math.floor(Number(amount) || 1), 1), 9999);
     const myTok = store.getTokens(socket.username);
-    if (myTok < 1) {
-      socket.emit("token-error", { message: "You have no tokens to donate." });
+    if (myTok < amt) {
+      socket.emit("token-error", { message: `You only have ${myTok} token${myTok !== 1 ? "s" : ""} to donate.` });
       return;
     }
-    store.setTokens(socket.username, myTok - 1);
-    store.setTokens(target, store.getTokens(target) + 1);
-    emitTokenUpdate(socket.username, `Sent 1 token to ${target} 🪙`);
-    emitTokenUpdate(target, `${socket.username} gifted you 1 token! 🪙`);
+    store.setTokens(socket.username, myTok - amt);
+    store.setTokens(target, store.getTokens(target) + amt);
+    emitTokenUpdate(socket.username, `Sent ${amt} token${amt !== 1 ? "s" : ""} to ${target} 🪙`);
+    emitTokenUpdate(target, `${socket.username} gifted you ${amt} token${amt !== 1 ? "s" : ""}! 🪙`);
   });
 
   // ── Collectables ─────────────────────────────────────────────────────────────────
