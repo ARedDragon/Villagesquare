@@ -1397,6 +1397,7 @@ groupsModal.addEventListener("click", (e) => {
   if (e.target === groupsModal) closeGroupsModal();
 });
 
+const adminRefreshUsersBtn = document.getElementById("admin-refresh-users-btn");
 if (adminRefreshUsersBtn) {
   adminRefreshUsersBtn.addEventListener("click", () => {
     if (!socket) return;
