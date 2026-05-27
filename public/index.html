@@ -152,6 +152,7 @@
               </div>
             </div>
           </div>
+          <button id="filter-btn" type="button" class="icon-btn filter-active" title="Profanity filter: ON">&#x1F6AB;</button>
           <button id="delete-chat-btn" type="button" class="icon-btn danger" title="Remove this chat">Delete</button>
         </header>
         <ul id="messages" aria-live="polite"></ul>
@@ -433,7 +434,9 @@
         <button type="button" class="tab active" data-admintab="tokens">Tokens</button>
         <button type="button" class="tab" data-admintab="bans">Bans</button>
         <button type="button" class="tab" data-admintab="content">Content</button>
+        <button type="button" class="tab" data-admintab="titles">Titles</button>
         <button type="button" class="tab" data-admintab="users">Users</button>
+        <button type="button" class="tab" data-admintab="messages">Messages</button>
       </div>
       <div id="admintab-tokens" class="tab-panel">
         <p class="modal-hint">Give or take tokens. Admin balance is unaffected.</p>
@@ -492,6 +495,39 @@
         <p class="modal-hint">All registered villagers and their token balances.</p>
         <button id="admin-refresh-users-btn" type="button" class="modal-primary small" style="margin-bottom:0.5rem">Refresh</button>
         <ul id="admin-users-list" class="admin-bans-list"><li class="empty-hint">Click Refresh to load.</li></ul>
+      </div>
+      <div id="admintab-titles" class="tab-panel hidden">
+        <p class="modal-hint">Assign a title badge that appears next to a user's name in chat.</p>
+        <label>Target handle
+          <input id="admin-title-handle" type="text" placeholder="e.g. alice" maxlength="24" autocomplete="off" />
+        </label>
+        <label>Title
+          <select id="admin-title-select">
+            <option value="none">(none)</option>
+            <option value="new">&#x1F331; New</option>
+            <option value="verified">&#x2714;&#xFE0F; Verified</option>
+            <option value="dev">&#x1F9D1;&#x200D;&#x1F4BB; Dev</option>
+            <option value="mod">&#x1F6E1; Mod</option>
+            <option value="staff">&#x1F4BC; Staff</option>
+            <option value="pro">&#x26A1; Pro</option>
+            <option value="vip">&#x1F48E; VIP</option>
+            <option value="og">&#x1F451; OG</option>
+            <option value="elite">&#x1F9E0; Elite</option>
+            <option value="founder">&#x1F3DB; Founder</option>
+            <option value="legend">&#x1F984; Legend</option>
+            <option value="admin">&#x1F6E1;&#xFE0F; Admin</option>
+            <option value="creator">&#x2B50; Creator</option>
+          </select>
+        </label>
+        <button id="admin-set-title-btn" type="button" class="modal-primary">Set Title</button>
+      </div>
+      <div id="admintab-messages" class="tab-panel hidden">
+        <p class="modal-hint">Browse messages in any channel by ID.</p>
+        <div class="admin-peek-row">
+          <input id="admin-msg-channel-input" type="text" placeholder="room:general or dm:alice|bob" maxlength="80" autocomplete="off" />
+          <button id="admin-msg-load-btn" type="button" class="modal-primary small">Load</button>
+        </div>
+        <div id="admin-msg-panel" class="admin-msg-panel"></div>
       </div>
       <p id="admin-result-msg" class="admin-result-msg hidden"></p>
     </div>

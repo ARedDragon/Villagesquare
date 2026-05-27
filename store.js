@@ -490,6 +490,23 @@ function clearMissedMentions(username) {
   }
 }
 
+// ── User Titles ──────────────────────────────────────────────────────────────
+const VALID_TITLES = ["new", "verified", "dev", "mod", "staff", "pro", "vip", "og", "elite", "founder", "legend", "admin", "creator"];
+
+function getTitle(handle) {
+  return data.titles?.[uk(handle)] || null;
+}
+
+function setTitle(handle, title) {
+  if (!data.titles) data.titles = {};
+  if (title === null || title === undefined) {
+    delete data.titles[uk(handle)];
+  } else {
+    data.titles[uk(handle)] = title;
+  }
+  scheduleSave();
+}
+
 load();
 
 module.exports = {
@@ -563,4 +580,8 @@ module.exports = {
   getMissedMentions,
   addMissedMention,
   clearMissedMentions,
+  // Titles
+  getTitle,
+  setTitle,
+  VALID_TITLES,
 };

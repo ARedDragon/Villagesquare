@@ -75,7 +75,7 @@ function getOnlineUsers() {
   for (const handle of socketsByUser.values()) handles.add(handle);
   return [...handles]
     .sort((a, b) => a.localeCompare(b))
-    .map((handle) => ({ handle, displayName: store.getDisplayName(handle) || handle }));
+    .map((handle) => ({ handle, displayName: store.getDisplayName(handle) || handle, title: store.getTitle(handle) }));
 }
 
 function userRoom(name) {
@@ -415,6 +415,7 @@ io.on("connection", (socket) => {
       nextTokenAt: store.getNextTokenAt(name),
       isAdmin: adminUser,
       missedMentions: store.getMissedMentions(name),
+      title: store.getTitle(name),
     });
     store.clearMissedMentions(name);
     io.emit("online-users", getOnlineUsers());
@@ -499,6 +500,35 @@ io.on("connection", (socket) => {
   socket.on("admin-get-bans", () => {
     if (!socket.username || socket.username !== ADMIN_HANDLE) return;
     socket.emit("admin-bans-list", store.getAllBans());
+  });
+
+  // Admin: set user title
+  socket.on("admin-set-title", ({ targetHandle, title }) => {
+    if (!socket.username || socket.username !== ADMIN_HANDLE) return;
+    const handle = String(targetHandle || "").trim().toLowerCase();
+    if (!handle) { socket.emit("admin-action-result", { ok: false, message: "No handle specified." }); return; }
+    const t = title === "none" ? null : String(title || "").trim().toLowerCase();
+    if (t !== null && !store.VALID_TITLES.includes(t)) {
+      socket.emit("admin-action-result", { ok: false, message: "Invalid title." }); return;
+    }
+    store.setTitle(handle, t);
+    // Notify the target user if online
+    const targetSockets = [...io.sockets.sockets.values()].filter((s) => s.username === handle);
+    for (const ts of targetSockets) ts.emit("title-updated", { title: t });
+    io.emit("online-users", getOnlineUsers()); // refresh online list with new title
+    socket.emit("admin-action-result", { ok: true, message: `Title ${t ? `"${t}"` : "removed"} for ${handle}.` });
+  });
+
+  // Admin: get all users list
+  socket.on("admin-get-users", () => {
+    if (!socket.username || socket.username !== ADMIN_HANDLE) return;
+    const allUsers = store.getAllUsers();
+    socket.emit("admin-users-list", allUsers.map((u) => ({
+      handle: u.handle || u.username || u,
+      displayName: store.getDisplayName(u.handle || u.username || u),
+      tokens: store.getTokens(u.handle || u.username || u),
+      title: store.getTitle(u.handle || u.username || u),
+    })));
   });
 
   // Admin: delete any group
@@ -768,6 +798,7 @@ io.on("connection", (socket) => {
       channelId,
       user: socket.username,
       displayName: socket.displayName || socket.username,
+      title: store.getTitle(socket.username),
       text: body,
       time: new Date().toISOString(),
     };

@@ -136,6 +136,9 @@ let onlineUsers = [];
 let knownGroups = [];
 let syncTimer = null;
 let blockedUsers = new Set();
+let ignoredUsers = new Set(JSON.parse(localStorage.getItem("villagesquare-ignored") || "[]"));
+let userTitles = {}; // handle.lower() -> title string
+let filterEnabled = localStorage.getItem("villagesquare-filter") !== "off"; // on by default
 let activeGameId = null;
 let pendingPasscodeGroupName = null;
 let gsCurrentGroup = null;
@@ -296,6 +299,28 @@ function updatePageTitle() {
   document.title = total > 0 ? `(${total}) VillageSquare` : "VillageSquare";
 }
 
+// ── Title badge ────────────────────────────────────────────────────────────────
+const TITLE_META = {
+  new:     { label: "NEW",     cls: "title-new" },
+  verified:{ label: "✓",       cls: "title-verified" },
+  dev:     { label: "DEV",     cls: "title-dev" },
+  mod:     { label: "MOD",     cls: "title-mod" },
+  staff:   { label: "STAFF",   cls: "title-staff" },
+  pro:     { label: "PRO",     cls: "title-pro" },
+  vip:     { label: "VIP",     cls: "title-vip" },
+  og:      { label: "OG",      cls: "title-og" },
+  elite:   { label: "ELITE",   cls: "title-elite" },
+  founder: { label: "FOUNDER", cls: "title-founder" },
+  legend:  { label: "LEGEND",  cls: "title-legend" },
+  admin:   { label: "ADMIN",   cls: "title-admin" },
+  creator: { label: "★",       cls: "title-creator" },
+};
+function titleBadgeHtml(title) {
+  const m = title && TITLE_META[title];
+  if (!m) return "";
+  return `<span class="title-badge ${m.cls}">${m.label}</span>`;
+}
+
 function renderChatList() {
   chatListEl.innerHTML = "";
   const sorted = [...chats].sort((a, b) => {
@@ -364,18 +389,37 @@ function renderOnlineList() {
   for (const u of others) {
     const handle = u.handle || u;
     const isBlocked = blockedUsers.has(handle);
+    const isIgnored = ignoredUsers.has(handle.toLowerCase());
     const isFriend = myFriends.some((n2) => n2.toLowerCase() === handle.toLowerCase());
     const isPending = sentFriendRequests.some((n2) => n2.toLowerCase() === handle.toLowerCase());
     const hasIncoming = friendRequests.some((n2) => n2.toLowerCase() === handle.toLowerCase());
+    const uTitle = u.title || userTitles[handle.toLowerCase()] || null;
 
     const li = document.createElement("li");
     li.className = "online-item-row";
 
     const msgBtn = document.createElement("button");
     msgBtn.type = "button";
-    msgBtn.className = "online-item" + (isBlocked ? " is-blocked" : "");
-    msgBtn.innerHTML = `<span class="dot"></span><span>${isBlocked ? "🚫 " : ""}${escapeHtml(displayName(handle))}</span>`;
-    if (!isBlocked) msgBtn.addEventListener("click", () => startDm(handle));
+    msgBtn.className = "online-item" + (isBlocked ? " is-blocked" : "") + (isIgnored ? " is-ignored" : "");
+    msgBtn.innerHTML =
+      (isBlocked ? `<span class="dot"></span><span>🚫 ${escapeHtml(displayName(handle))}</span>` :
+       isIgnored ? `<span class="dot"></span><span>🔕 ${escapeHtml(displayName(handle))}</span>` :
+       `<span class="dot"></span>${titleBadgeHtml(uTitle)}<span>${escapeHtml(displayName(handle))}</span>`);
+    // Double-click to ignore (single click = DM as usual for non-blocked/ignored)
+    if (!isBlocked && !isIgnored) {
+      let _clickCount = 0, _clickTimer = null;
+      msgBtn.addEventListener("click", () => {
+        _clickCount++;
+        if (_clickCount === 1) {
+          _clickTimer = setTimeout(() => { _clickCount = 0; startDm(handle); }, 350);
+        } else {
+          clearTimeout(_clickTimer); _clickCount = 0;
+          if (confirm(`Ignore ${handle}? Their messages will be hidden. You can unignore from the online list.`)) {
+            ignoreUser(handle);
+          }
+        }
+      });
+    }
     li.appendChild(msgBtn);
 
     if (!isBlocked) {
@@ -424,6 +468,17 @@ function renderOnlineList() {
       else blockUser(handle);
     });
     li.appendChild(blockBtn);
+
+    if (isIgnored) {
+      const unignoreBtn = document.createElement("button");
+      unignoreBtn.type = "button";
+      unignoreBtn.className = "block-user-btn unblock";
+      unignoreBtn.title = "Unignore " + handle;
+      unignoreBtn.textContent = "🔔";
+      unignoreBtn.addEventListener("click", (e) => { e.stopPropagation(); unignoreUser(handle); });
+      li.appendChild(unignoreBtn);
+    }
+
     onlineListEl.appendChild(li);
   }
 }
@@ -599,6 +654,7 @@ function renderMessages(channelId) {
   const isDm = channelId.startsWith("dm:");
   for (const msg of list) {
     if (msg.type === "chat" && blockedUsers.has(msg.user)) continue;
+    if (msg.type === "chat" && ignoredUsers.has(msg.user.toLowerCase())) continue;
 
     const li = document.createElement("li");
 
@@ -618,16 +674,19 @@ function renderMessages(channelId) {
         `<span>${escapeHtml(msg.text)}</span>`;
     } else {
       const isMine = msg.user === myName;
-      li.className = "msg chat" + (isMine ? " mine" : "") + (isDm ? " dm" : "");
+      const msgTitle = msg.title || userTitles[msg.user.toLowerCase()] || null;
+      li.className = "msg chat" + (isMine ? " mine" : "") + (isDm ? " dm" : "") + (isMine && msgTitle ? ` mine-${msgTitle}` : "");
       const senderLabel = msg.displayName || displayName(msg.user);
       const initial = senderLabel.charAt(0).toUpperCase();
+      const filteredText = applyFilter(msg.text);
       li.innerHTML =
         `<div class="msg-author-row">` +
-          `<span class="msg-avatar-sm">${escapeHtml(initial)}</span>` +
+          `<span class="msg-avatar-sm${msgTitle ? ` avatar-${msgTitle}` : ""}">${escapeHtml(initial)}</span>` +
+          titleBadgeHtml(msgTitle) +
           `<span class="msg-author-name">${escapeHtml(senderLabel)}</span>` +
           `<span class="meta">${formatTime(msg.time)}</span>` +
         `</div>` +
-        `<span class="msg-text">${escapeHtml(msg.text)}</span>` +
+        `<span class="msg-text">${escapeHtml(filteredText)}</span>` +
         (isMine || isAdmin
           ? `<button type="button" class="delete-msg-btn" data-msgid="${escapeAttr(msg.id)}" title="Delete message">×</button>`
           : "");
@@ -831,6 +890,36 @@ function blockUser(name) {
 function unblockUser(name) {
   if (!socket || !name) return;
   socket.emit("unblock-user", { targetName: name });
+}
+
+function ignoreUser(name) {
+  ignoredUsers.add(name.toLowerCase());
+  try { localStorage.setItem("villagesquare-ignored", JSON.stringify([...ignoredUsers])); } catch (_) {}
+  renderOnlineList();
+  if (activeChannelId) renderMessages(activeChannelId);
+}
+
+function unignoreUser(name) {
+  ignoredUsers.delete(name.toLowerCase());
+  try { localStorage.setItem("villagesquare-ignored", JSON.stringify([...ignoredUsers])); } catch (_) {}
+  renderOnlineList();
+  if (activeChannelId) renderMessages(activeChannelId);
+}
+
+// ── Profanity filter ──────────────────────────────────────────────────────────
+const _BAD_WORDS = [
+  "fuck","shit","ass","bitch","cunt","dick","pussy","cock","whore","slut",
+  "nigger","nigga","faggot","fag","retard","kike","spic","chink","wetback","cracker",
+  "bastard","damn","hell","crap","piss","asshole","motherfucker","bullshit",
+  "wanker","twat","prick","arse","bollocks","tosser",
+];
+const _FILTER_RE = new RegExp(
+  "\\b(" + _BAD_WORDS.map((w) => w.split("").join("[^a-z0-9]*")).join("|") + ")\\b",
+  "gi"
+);
+function applyFilter(text) {
+  if (!filterEnabled) return text;
+  return text.replace(_FILTER_RE, (m) => m[0] + "*".repeat(Math.max(1, m.length - 1)));
 }
 
 function deleteMessage(messageId) {
@@ -1122,12 +1211,13 @@ async function connect() {
     // Don't disconnect — let user re-submit with their PIN
   });
 
-  socket.on("registered", ({ handle, username, displayName: dn, chats: serverChats, groups, blocked, friends, friendRequests: friendReqs, sentRequests, friendsWithNames, tokens, nextTokenAt: nat, isAdmin: adminFlag, missedMentions }) => {
+  socket.on("registered", ({ handle, username, displayName: dn, chats: serverChats, groups, blocked, friends, friendRequests: friendReqs, sentRequests, friendsWithNames, tokens, nextTokenAt: nat, isAdmin: adminFlag, missedMentions, title }) => {
     myName = handle || username;
     myDisplayName = dn || myName;
     isAdmin = !!adminFlag;
     myNameLabel.textContent = myDisplayName;
     if (myHandleLabel) myHandleLabel.textContent = "@" + myName;
+    if (title) userTitles[myName.toLowerCase()] = title;
     knownGroups = groups || [];
     blockedUsers = new Set(blocked || []);
     myFriends = friends || [];
@@ -1174,7 +1264,13 @@ async function connect() {
   });
 
   socket.on("online-users", (users) => {
-    onlineUsers = users; // [{ handle, displayName }] or legacy string[]
+    onlineUsers = users; // [{ handle, displayName, title? }] or legacy string[]
+    // Update title map from online users
+    for (const u of users) {
+      const h = (u.handle || u).toLowerCase();
+      if (u.title) userTitles[h] = u.title;
+      else if (userTitles[h] && !u.title) delete userTitles[h];
+    }
     renderOnlineList();
     renderFriendsList();
     // Keep DM subtitle in sync as friends go on/offline
@@ -1397,6 +1493,11 @@ async function connect() {
     showToast("⏳ " + escapeHtml(message || "Slow down!"));
     messageInput.disabled = true;
     setTimeout(() => { messageInput.disabled = false; messageInput.focus(); }, cooldownMs || 3000);
+  });
+
+  socket.on("title-updated", ({ title }) => {
+    if (myName) userTitles[myName.toLowerCase()] = title || null;
+    if (activeChannelId) renderMessages(activeChannelId);
   });
 
   socket.on("token-error", ({ message }) => {
@@ -1811,7 +1912,7 @@ function showAdminTab(tabName) {
   document.querySelectorAll(".tab[data-admintab]").forEach((t) => {
     t.classList.toggle("active", t.dataset.admintab === tabName);
   });
-  ["tokens", "bans", "content"].forEach((name) => {
+  ["tokens", "bans", "content", "titles", "users", "messages"].forEach((name) => {
     const el = document.getElementById("admintab-" + name);
     if (el) el.classList.toggle("hidden", name !== tabName);
   });
@@ -2011,6 +2112,77 @@ function cycleTheme() {
 }
 
 if (themeBtn) themeBtn.addEventListener("click", cycleTheme);
+
+// ── Profanity filter toggle ────────────────────────────────────────────────────
+const filterBtn = document.getElementById("filter-btn");
+function updateFilterBtn() {
+  if (!filterBtn) return;
+  filterBtn.title = filterEnabled ? "Profanity filter: ON (click to disable)" : "Profanity filter: OFF (click to enable)";
+  filterBtn.classList.toggle("filter-active", filterEnabled);
+  filterBtn.classList.toggle("filter-off", !filterEnabled);
+}
+if (filterBtn) {
+  filterBtn.addEventListener("click", () => {
+    filterEnabled = !filterEnabled;
+    try { localStorage.setItem("villagesquare-filter", filterEnabled ? "on" : "off"); } catch (_) {}
+    updateFilterBtn();
+    if (activeChannelId) renderMessages(activeChannelId);
+  });
+  updateFilterBtn();
+}
+
+// ── Admin: Titles tab ─────────────────────────────────────────────────────────
+const adminTitleHandle = document.getElementById("admin-title-handle");
+const adminTitleSelect = document.getElementById("admin-title-select");
+const adminSetTitleBtn = document.getElementById("admin-set-title-btn");
+if (adminSetTitleBtn) {
+  adminSetTitleBtn.addEventListener("click", () => {
+    const handle = adminTitleHandle ? adminTitleHandle.value.trim() : "";
+    const title  = adminTitleSelect ? adminTitleSelect.value : "none";
+    if (!handle || !socket) return;
+    socket.emit("admin-set-title", { targetHandle: handle, title });
+  });
+}
+
+// ── Admin: Messages tab ────────────────────────────────────────────────────────
+const adminMsgChannelInput = document.getElementById("admin-msg-channel-input");
+const adminMsgLoadBtn      = document.getElementById("admin-msg-load-btn");
+const adminMsgPanel        = document.getElementById("admin-msg-panel");
+
+function renderAdminMessages(channelId, messages) {
+  if (!adminMsgPanel) return;
+  if (!messages || !messages.length) {
+    adminMsgPanel.innerHTML = "<p class='empty-hint'>No messages in this channel.</p>";
+    return;
+  }
+  adminMsgPanel.innerHTML = messages.map((m) => {
+    const t = m.title ? `<span class="title-badge ${TITLE_META[m.title]?.cls || ""}">${TITLE_META[m.title]?.label || m.title}</span>` : "";
+    const safeUser = escapeHtml(m.displayName || m.user || "?");
+    const safeText = escapeHtml(m.text || m.gameName || "");
+    const time = m.time ? formatTime(m.time) : "";
+    return `<div class="admin-msg-row">
+      <span class="admin-msg-meta">${time} ${t}<strong>${safeUser}</strong></span>
+      <span class="admin-msg-text">${safeText}</span>
+    </div>`;
+  }).join("");
+  adminMsgPanel.scrollTop = adminMsgPanel.scrollHeight;
+}
+
+if (adminMsgLoadBtn && adminMsgChannelInput) {
+  const doAdminLoad = () => {
+    const cid = adminMsgChannelInput.value.trim();
+    if (!cid || !socket) return;
+    socket.emit("admin-view-channel", { channelId: cid });
+    // Listen once for the response
+    socket.once("channel-history", ({ channelId, messages }) => {
+      if (channelId === cid) renderAdminMessages(channelId, messages);
+    });
+  };
+  adminMsgLoadBtn.addEventListener("click", doAdminLoad);
+  adminMsgChannelInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdminLoad(); });
+}
+
+// Extend showAdminTab to include new tabs — handled above in definition
 
 // Restore saved theme on load
 applyTheme(localStorage.getItem("villagesquare-theme") || "dark");
